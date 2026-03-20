@@ -2,58 +2,47 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>QR Scanner App</title>
+  <title>RGB QR Multiplexer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
-  <!-- Подключаем стили -->
   <link rel="stylesheet" href="css/style.css">
-  
-  <!-- Подключаем библиотеку jsQR (для распознавания QR-кодов) -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 </head>
-
 <body>
 
   <div class="container">
-    <h1>QR Tool</h1>
+    <h1>RGB Multiplexer</h1>
 
-    <!-- Поле для ввода текста -->
-    <input type="text" id="textInput" placeholder="Введите текст или URL">
+    <input type="text" id="inputRed" placeholder="Текст для КРАСНОГО канала">
+    <input type="text" id="inputGreen" placeholder="Текст для ЗЕЛЕНОГО канала">
+    <input type="text" id="inputBlue" placeholder="Текст для СИНЕГО канала">
 
-    <!-- Кнопки -->
     <div class="buttons">
-      <button id="generateBtn">Создать QR</button>
-      <button id="scanBtn">Сканировать QR</button>
+      <button id="generateBtn" style="background: #622;">Создать RGB QR</button>
+      <button id="scanBtn">Открыть Сканер</button>
     </div>
 
-    <!-- Место, куда выводится сгенерированный QR-код -->
     <div id="qrResult"></div>
-
-    <!-- Место, куда будет выводиться результат сканирования -->
     <div id="scanResult"></div>
   </div>
 
-  <!-- === Блок для сканера (пока скрыт) === -->
   <div id="scannerOverlay" class="scanner-overlay" style="display: none;">
     <div class="scanner-container">
-      <h2>Наведите камеру на QR-код</h2>
+      <h2>Выберите канал для чтения:</h2>
       
-      <!-- Видео с камеры -->
+      <div class="buttons" style="margin-bottom: 10px;">
+        <button onclick="setChannel('R')" style="background: #822;">Red</button>
+        <button onclick="setChannel('G')" style="background: #282;">Green</button>
+        <button onclick="setChannel('B')" style="background: #228;">Blue</button>
+      </div>
+
       <video id="video" autoplay playsinline></video>
-      
-      <!-- Рамка наведения (визуальная подсказка) -->
       <div class="scan-frame"></div>
       
-      <!-- Кнопка закрытия -->
       <button id="closeScanner">Закрыть</button>
-      
-      <!-- Сообщение об ошибке или статусе -->
       <div id="scanMessage"></div>
     </div>
   </div>
 
-  <!-- Подключаем наш JavaScript -->
   <script src="js/core.js"></script>
-
 </body>
 </html>
