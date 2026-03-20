@@ -1,59 +1,64 @@
-// === ГЕНЕРАТОР: Синий QR на БЕЛОМ фоне ===
+let currentChannel = 'B'; // По умолчанию ищем синий
 
-document.getElementById("generateBtn").addEventListener("click", () => {
-    const text = document.getElementById("textInput").value.trim();
-    if (!text) {
-        alert("Введите текст!");
-        return;
+function setChannel(ch) {
+    currentChannel = ch;
+    document.getElementById("scanMessage").textContent = "Ищем канал: " + ch;
+}
+
+// Функция для генерации одного QR-слоя
+async function getQRData(text, size) {
+    if (!text) return null;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&bgcolor=ffffff`;
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.src = qrUrl;
+        img.onload = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0);
+            resolve(ctx.getImageData(0, 0, size, size).data);
+        };
+        img.onerror = () => resolve(null);
+    });
+}
+
+document.getElementById("generateBtn").addEventListener("click", async () => {
+    const size = 300;
+    const txtR = document.getElementById("inputRed").value.trim();
+    const txtG = document.getElementById("inputGreen").value.trim();
+    const txtB = document.getElementById("inputBlue").value.trim();
+
+    const dataR = await getQRData(txtR, size);
+    const dataG = await getQRData(txtG, size);
+    const dataB = await getQRData(txtB, size);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    const finalImg = ctx.createImageData(size, size);
+    const d = finalImg.data;
+
+    for (let i = 0; i < d.length; i += 4) {
+        // Если в ч/б коде пиксель черный (<128), активируем цвет в канале
+        d[i]     = (dataR && dataR[i] < 128) ? 255 : 0;   // Red канал
+        d[i + 1] = (dataG && dataG[i] < 128) ? 255 : 0;   // Green канал
+        d[i + 2] = (dataB && dataB[i] < 128) ? 255 : 0;   // Blue канал
+        d[i + 3] = 255; // Альфа
     }
 
-    const size = 300;
-    // API генерирует ч/б код, мы его перекрасим
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&bgcolor=ffffff`;
-
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = qrUrl;
-
-    img.onload = () => {
-        const canvas = document.createElement("canvas");
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext("2d");
-
-        ctx.drawImage(img, 0, 0, size, size);
-        const imageData = ctx.getImageData(0, 0, size, size);
-        const data = imageData.data;
-
-        for (let i = 0; i < data.length; i += 4) {
-            const r = data[i];
-            const g = data[i + 1];
-            const b = data[i + 2];
-
-            // Если пиксель темный (черная часть QR) -> делаем его чисто СИНИМ
-            if (r < 128 && g < 128 && b < 128) {
-                data[i]     = 0;   // R
-                data[i + 1] = 0;   // G
-                data[i + 2] = 255; // B (Ярко-синий)
-            } else {
-                // Если пиксель светлый -> оставляем БЕЛЫМ
-                data[i]     = 255;
-                data[i + 1] = 255;
-                data[i + 2] = 255;
-            }
-        }
-
-        ctx.putImageData(imageData, 0, 0);
-        const resultDiv = document.getElementById("qrResult");
-        resultDiv.innerHTML = '';
-        const hiddenQR = document.createElement("img");
-        hiddenQR.src = canvas.toDataURL("image/png");
-        resultDiv.appendChild(hiddenQR);
-    };
+    ctx.putImageData(finalImg, 0, 0);
+    const resultDiv = document.getElementById("qrResult");
+    resultDiv.innerHTML = '';
+    const imgElement = document.createElement("img");
+    imgElement.src = canvas.toDataURL("image/png");
+    resultDiv.appendChild(imgElement);
 });
 
-// === СКАНЕР: Превращает синий в черный для чтения ===
-
+// === СЕКЦИЯ СКАНЕРА ===
 const scanBtn = document.getElementById("scanBtn");
 const scannerOverlay = document.getElementById("scannerOverlay");
 const video = document.getElementById("video");
@@ -70,43 +75,35 @@ scanBtn.addEventListener("click", async () => {
         video.srcObject = stream;
         video.play();
         scanning = true;
+        setChannel('B');
         requestAnimationFrame(scanFrame);
     } catch (err) { alert("Камера недоступна"); }
 });
 
-closeScanner.addEventListener("click", stopScanner);
-
-function stopScanner() {
+closeScanner.addEventListener("click", () => {
     scanning = false;
     scannerOverlay.style.display = "none";
     if (stream) stream.getTracks().forEach(t => t.stop());
-}
+});
 
 function scanFrame() {
     if (!scanning) return;
-
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
         const canvas = document.createElement("canvas");
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         const ctx = canvas.getContext("2d");
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
+        ctx.drawImage(video, 0, 0);
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
-
-        // Создаем ЧЕРНО-БЕЛУЮ копию для библиотеки
         const bwData = new Uint8ClampedArray(data.length);
 
         for (let i = 0; i < data.length; i += 4) {
-            const r = data[i];
-            const g = data[i + 1];
-            const b = data[i + 2];
-
-            // ФИЛЬТР: Если синего МНОГО, а красного и зеленого МАЛО -> это наш QR (черный)
-            // Иначе -> это фон (белый)
-            const isBlue = (b > 100 && r < 150 && g < 150);
-            const val = isBlue ? 0 : 255;
+            let val = 255;
+            // Фильтруем пиксель в зависимости от выбранного канала
+            if (currentChannel === 'R' && data[i] > 150) val = 0;
+            if (currentChannel === 'G' && data[i+1] > 150) val = 0;
+            if (currentChannel === 'B' && data[i+2] > 150) val = 0;
 
             bwData[i] = bwData[i+1] = bwData[i+2] = val;
             bwData[i+3] = 255;
@@ -114,9 +111,8 @@ function scanFrame() {
 
         const code = jsQR(bwData, canvas.width, canvas.height);
         if (code) {
-            scanResult.innerHTML = "Найдено: " + code.data;
-            stopScanner();
-            return;
+            scanResult.innerHTML = `<strong>[${currentChannel}] Найдено:</strong> ` + code.data;
+            // Не закрываем сканер сразу, чтобы можно было переключить канал
         }
     }
     requestAnimationFrame(scanFrame);
